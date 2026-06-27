@@ -1,0 +1,25 @@
+{
+  "name": "obsidian-nnyj-syntax-highlight",
+  "version": "1.0.0",
+  "description": "CM6 syntax decorations for colons, arrows, comments, and brackets in markdown notes.",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "lint": "eslint .",
+    "version": "node version-bump.mjs && git add manifest.json versions.json"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.15.17",
+    "esbuild": "0.25.5",
+    "eslint": "^10.6.0",
+    "eslint-plugin-obsidianmd": "^0.3.0",
+    "globals": "^17.7.0",
+    "obsidian": "latest",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.62.0"
+  }
+}

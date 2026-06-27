@@ -1,0 +1,10 @@
+{
+  "id": "nnyj-syntax-highlight",
+  "name": "NNYJ Syntax Highlight",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "CM6 syntax decorations for colons, arrows, comments, and brackets in markdown notes.",
+  "author": "nnyj",
+  "authorUrl": "https://github.com/nnyj",
+  "isDesktopOnly": false
+}
