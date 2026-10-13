@@ -94,6 +94,33 @@ function buildDecorations(view: EditorView): DecorationSet {
   return builder.finish();
 }
 
+const LEVEL_CLASSES = [0, 1, 2, 3, 4].map(level => `nnyj-level-${level}`);
+const CIRCLE_LEVELS: Record<string, number> = { '🔴': 0, '🟡': 2, '🟢': 4 };
+const RE_NUMBER = /^[-+]?\d[\d,]*(\.\d+)?\s*[%a-zA-Z]*$/;
+
+// Circle cells take the circle's level. Numeric columns scale min..max to red..green, `↓` in the header flips it.
+function shadeTable(table: HTMLTableElement) {
+  const [head, ...rows] = Array.from(table.rows);
+  if (!head) return;
+  for (const row of rows) for (const cell of Array.from(row.cells)) cell.classList.remove(...LEVEL_CLASSES);
+  Array.from(head.cells).forEach((headCell, col) => {
+    const column = rows.map(row => row.cells[col]).filter(cell => cell?.textContent?.trim()) as HTMLTableCellElement[];
+    const text = (cell: HTMLTableCellElement) => cell.textContent.trim();
+    const circle = (cell: HTMLTableCellElement) => CIRCLE_LEVELS[[...text(cell)][0]!];
+    const plain = column.filter(cell => circle(cell) === undefined);
+    column.filter(cell => !plain.includes(cell)).forEach(cell => cell.classList.add(LEVEL_CLASSES[circle(cell)!]!));
+    if (!plain.length || !plain.every(cell => RE_NUMBER.test(text(cell)))) return;
+    const values = plain.map(cell => parseFloat(text(cell).replace(/,/g, '')));
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    if (max === min) return;
+    plain.forEach((cell, k) => {
+      const level = Math.round((values[k]! - min) / (max - min) * 4);
+      cell.classList.add(LEVEL_CLASSES[headCell.textContent?.includes('↓') ? 4 - level : level]!);
+    });
+  });
+}
+
 const highlightPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
@@ -103,6 +130,8 @@ const highlightPlugin = ViewPlugin.fromClass(
     update(update: ViewUpdate) {
       if (update.docChanged || update.viewportChanged)
         this.decorations = buildDecorations(update.view);
+      // Live Preview table widgets render after this update, so shade on the next frame.
+      window.requestAnimationFrame(() => update.view.dom.querySelectorAll('table').forEach(shadeTable));
     }
   },
   { decorations: (v) => v.decorations }
@@ -111,6 +140,7 @@ const highlightPlugin = ViewPlugin.fromClass(
 export default class NnyjSyntaxHighlight extends Plugin {
   onload() {
     this.registerEditorExtension(highlightPlugin);
+    this.registerMarkdownPostProcessor(element => element.querySelectorAll('table').forEach(shadeTable));
     this.app.workspace.onLayoutReady(() => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
       const cmd = (this.app as any).commands.commands['editor:save-file'] as { icon?: string } | undefined;

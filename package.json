@@ -1,6 +1,6 @@
 {
   "name": "obsidian-nnyj-syntax-highlight",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "CM6 syntax decorations for colons, arrows, comments, and brackets in markdown notes.",
   "main": "main.js",
   "type": "module",
