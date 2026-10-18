@@ -97,6 +97,7 @@ function buildDecorations(view: EditorView): DecorationSet {
 const LEVEL_CLASSES = [0, 1, 2, 3, 4].map(level => `nnyj-level-${level}`);
 const CIRCLE_LEVELS: Record<string, number> = { '🔴': 0, '🟡': 2, '🟢': 4 };
 const RE_NUMBER = /^[-+]?\d[\d,]*(\.\d+)?\s*[%a-zA-Z]*$/;
+const RE_PLACEHOLDER = /^(-+|–|—)$/;
 
 // Circle cells take the circle's level. Numeric columns scale min..max to red..green, `↓` in the header flips it.
 function shadeTable(table: HTMLTableElement) {
@@ -104,7 +105,7 @@ function shadeTable(table: HTMLTableElement) {
   if (!head) return;
   for (const row of rows) for (const cell of Array.from(row.cells)) cell.classList.remove(...LEVEL_CLASSES);
   Array.from(head.cells).forEach((headCell, col) => {
-    const column = rows.map(row => row.cells[col]).filter(cell => cell?.textContent?.trim()) as HTMLTableCellElement[];
+    const column = rows.map(row => row.cells[col]).filter(cell => cell?.textContent?.trim() && !RE_PLACEHOLDER.test(cell.textContent.trim())) as HTMLTableCellElement[];
     const text = (cell: HTMLTableCellElement) => cell.textContent.trim();
     const circle = (cell: HTMLTableCellElement) => CIRCLE_LEVELS[[...text(cell)][0]!];
     const plain = column.filter(cell => circle(cell) === undefined);
