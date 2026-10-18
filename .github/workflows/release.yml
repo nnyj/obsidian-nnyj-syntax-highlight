@@ -15,6 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Checkout stores the tag without its message, --notes-from-tag needs the annotated tag.
+      - name: Fetch annotated tag
+        run: git fetch --force origin "+${GITHUB_REF}:${GITHUB_REF}"
+
       - name: Use Node.js
         uses: actions/setup-node@v6
         with:
@@ -40,5 +44,5 @@ jobs:
           tag="${GITHUB_REF#refs/tags/}"
           gh release create "$tag" \
             --title="$tag" \
-            --draft \
+            --notes-from-tag \
             main.js manifest.json styles.css
