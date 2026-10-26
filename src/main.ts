@@ -143,8 +143,8 @@ export default class NnyjSyntaxHighlight extends Plugin {
     this.registerEditorExtension(highlightPlugin);
     this.registerMarkdownPostProcessor(element => element.querySelectorAll('table').forEach(shadeTable));
     this.app.workspace.onLayoutReady(() => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
-      const cmd = (this.app as any).commands.commands['editor:save-file'] as { icon?: string } | undefined;
+      const app = this.app as unknown as { commands: { commands: Record<string, { icon?: string } | undefined> } };
+      const cmd = app.commands.commands['editor:save-file'];
       if (cmd && !cmd.icon) cmd.icon = 'save';
     });
   }
