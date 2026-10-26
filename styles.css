@@ -2,8 +2,8 @@
 .markdown-source-view.mod-cm6 .cm-line .nnyj-colon { color: #9CDCFE; }
 .markdown-source-view.mod-cm6 .cm-line .nnyj-arrow { color: #97ff42; font-weight: bold; }
 .markdown-source-view.mod-cm6 .cm-line .nnyj-bracket { color: #ceba78; }
-:is(.markdown-rendered, .markdown-source-view) td.nnyj-level-0 { background-color: rgba(239, 68, 68, 0.5); }
-:is(.markdown-rendered, .markdown-source-view) td.nnyj-level-1 { background-color: rgba(249, 115, 22, 0.5); }
-:is(.markdown-rendered, .markdown-source-view) td.nnyj-level-2 { background-color: rgba(234, 179, 8, 0.5); }
-:is(.markdown-rendered, .markdown-source-view) td.nnyj-level-3 { background-color: rgba(132, 204, 22, 0.5); }
-:is(.markdown-rendered, .markdown-source-view) td.nnyj-level-4 { background-color: rgba(34, 197, 94, 0.5); }
+.markdown-rendered td.nnyj-level-0, .markdown-source-view.mod-cm6 .cm-content .nnyj-level-0 { background-color: rgba(239, 68, 68, 0.5); }
+.markdown-rendered td.nnyj-level-1, .markdown-source-view.mod-cm6 .cm-content .nnyj-level-1 { background-color: rgba(249, 115, 22, 0.5); }
+.markdown-rendered td.nnyj-level-2, .markdown-source-view.mod-cm6 .cm-content .nnyj-level-2 { background-color: rgba(234, 179, 8, 0.5); }
+.markdown-rendered td.nnyj-level-3, .markdown-source-view.mod-cm6 .cm-content .nnyj-level-3 { background-color: rgba(132, 204, 22, 0.5); }
+.markdown-rendered td.nnyj-level-4, .markdown-source-view.mod-cm6 .cm-content .nnyj-level-4 { background-color: rgba(34, 197, 94, 0.5); }

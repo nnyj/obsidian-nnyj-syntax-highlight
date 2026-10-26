@@ -20,7 +20,7 @@ CM6 syntax decorations for markdown notes in Obsidian. Highlights colons, arrows
 | Arrow | `--> <--` | `nnyj-arrow` |
 | Parentheses | `(text)` | `nnyj-bracket` |
 
-Table cells starting with 🔴, 🟡 or 🟢 get a matching background. Numeric columns shade red (lowest) to green (highest), `↓` in the header flips the scale. Dash cells in numeric columns are skipped.
+Table cells starting with 🔴, 🟡 or 🟢 get a matching background. Columns shade red (lowest) to green (highest) by the number each cell starts with, after an optional `~` or `$`. `↓` in the header flips the scale. Other cells are skipped.
 
 Fenced code blocks and inline code are skipped.
 

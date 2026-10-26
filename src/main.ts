@@ -1,6 +1,6 @@
 import { Plugin } from 'obsidian';
 import { ViewPlugin, Decoration, EditorView, ViewUpdate, DecorationSet } from '@codemirror/view';
-import { RangeSetBuilder, Text } from '@codemirror/state';
+import { RangeSetBuilder, Text, type Range } from '@codemirror/state';
 
 interface Pattern {
   re: () => RegExp;
@@ -96,31 +96,92 @@ function buildDecorations(view: EditorView): DecorationSet {
 
 const LEVEL_CLASSES = [0, 1, 2, 3, 4].map(level => `nnyj-level-${level}`);
 const CIRCLE_LEVELS: Record<string, number> = { '🔴': 0, '🟡': 2, '🟢': 4 };
-const RE_NUMBER = /^[-+]?\d[\d,]*(\.\d+)?\s*[%a-zA-Z]*$/;
-const RE_PLACEHOLDER = /^(-+|–|—)$/;
+// Leading number after an optional `~` or `$`, trailing text like ` ms` or ` (1.2x)` is ignored.
+const RE_NUMBER = /^[~$]*([-+]?\d[\d,]*(?:\.\d+)?)/;
+const RE_ROW = /^\s*\|.*\|\s*$/;
+const RE_SEP = /^\s*\|[\s:|-]+\|\s*$/;
 
-// Circle cells take the circle's level. Numeric columns scale min..max to red..green, `↓` in the header flips it.
+// Circle cells take the circle's level. Numeric cells scale min..max to red..green, `↓` in the header flips it.
+function columnLevels(head: string, cells: string[]): (number | undefined)[] {
+  const values = cells.map(cell => {
+    const match = RE_NUMBER.exec(cell);
+    return match ? parseFloat(match[1]!.replace(/,/g, '')) : undefined;
+  });
+  const numbers = values.filter(value => value !== undefined);
+  const min = Math.min(...numbers);
+  const max = Math.max(...numbers);
+  return cells.map((cell, k) => {
+    const circle = CIRCLE_LEVELS[[...cell][0] ?? ''];
+    const value = values[k];
+    if (circle !== undefined || value === undefined || max === min) return circle;
+    const level = Math.round((value - min) / (max - min) * 4);
+    return head.includes('↓') ? 4 - level : level;
+  });
+}
+
 function shadeTable(table: HTMLTableElement) {
   const [head, ...rows] = Array.from(table.rows);
   if (!head) return;
-  for (const row of rows) for (const cell of Array.from(row.cells)) cell.classList.remove(...LEVEL_CLASSES);
   Array.from(head.cells).forEach((headCell, col) => {
-    const column = rows.map(row => row.cells[col]).filter(cell => cell?.textContent?.trim() && !RE_PLACEHOLDER.test(cell.textContent.trim())) as HTMLTableCellElement[];
-    const text = (cell: HTMLTableCellElement) => cell.textContent.trim();
-    const circle = (cell: HTMLTableCellElement) => CIRCLE_LEVELS[[...text(cell)][0]!];
-    const plain = column.filter(cell => circle(cell) === undefined);
-    column.filter(cell => !plain.includes(cell)).forEach(cell => cell.classList.add(LEVEL_CLASSES[circle(cell)!]!));
-    if (!plain.length || !plain.every(cell => RE_NUMBER.test(text(cell)))) return;
-    const values = plain.map(cell => parseFloat(text(cell).replace(/,/g, '')));
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    if (max === min) return;
-    plain.forEach((cell, k) => {
-      const level = Math.round((values[k]! - min) / (max - min) * 4);
-      cell.classList.add(LEVEL_CLASSES[headCell.textContent?.includes('↓') ? 4 - level : level]!);
-    });
+    const cells = rows.map(row => row.cells[col]);
+    const levels = columnLevels(headCell.textContent, cells.map(cell => cell?.textContent.trim() ?? ''));
+    // toggle with force skips unchanged classes, a DOM write would retrigger CodeMirror's observer
+    cells.forEach((cell, k) => LEVEL_CLASSES.forEach((cls, level) => cell?.classList.toggle(cls, levels[k] === level)));
   });
 }
+
+// Cell spans between unescaped pipes.
+function rowCells(text: string): { from: number; to: number; text: string }[] {
+  const pipes: number[] = [];
+  for (let c = 0; c < text.length; c++)
+    if (text[c] === '|' && text[c - 1] !== '\\') pipes.push(c);
+  return pipes.slice(1).map((to, k) => ({ from: pipes[k]! + 1, to, text: text.slice(pipes[k]! + 1, to).trim() }));
+}
+
+// Shades raw Markdown tables, e.g. indented under a list item or in source mode.
+function buildTableDecorations(view: EditorView): DecorationSet {
+  const { doc } = view.state;
+  const fenced = fencedCodeRanges(doc);
+  const ranges: Range<Decoration>[] = [];
+  let i = 1;
+  while (i <= doc.lines) {
+    let j = i;
+    while (j <= doc.lines && RE_ROW.test(doc.line(j).text)) j++;
+    const first = doc.line(i);
+    const isFenced = fenced.some(([a, b]) => first.from >= a && first.to <= b);
+    if (j - i >= 3 && !isFenced && RE_SEP.test(doc.line(i + 1).text)) {
+      const rows: { from: number; cells: ReturnType<typeof rowCells> }[] = [];
+      for (let n = i + 2; n < j; n++) {
+        const line = doc.line(n);
+        rows.push({ from: line.from, cells: rowCells(line.text) });
+      }
+      rowCells(first.text).forEach((head, col) => {
+        const levels = columnLevels(head.text, rows.map(row => row.cells[col]?.text ?? ''));
+        rows.forEach((row, k) => {
+          const cell = row.cells[col];
+          const level = levels[k];
+          if (cell && level !== undefined)
+            ranges.push(Decoration.mark({ class: LEVEL_CLASSES[level]! }).range(row.from + cell.from, row.from + cell.to));
+        });
+      });
+    }
+    i = Math.max(j, i + 1);
+  }
+  return Decoration.set(ranges, true);
+}
+
+const tablePlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = buildTableDecorations(view);
+    }
+    update(update: ViewUpdate) {
+      if (update.docChanged) this.decorations = buildTableDecorations(update.view);
+    }
+  },
+  { decorations: (v) => v.decorations }
+);
 
 const highlightPlugin = ViewPlugin.fromClass(
   class {
@@ -129,8 +190,8 @@ const highlightPlugin = ViewPlugin.fromClass(
       this.decorations = buildDecorations(view);
     }
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged)
-        this.decorations = buildDecorations(update.view);
+      if (!update.docChanged && !update.viewportChanged) return;
+      this.decorations = buildDecorations(update.view);
       // Live Preview table widgets render after this update, so shade on the next frame.
       window.requestAnimationFrame(() => update.view.dom.querySelectorAll('table').forEach(shadeTable));
     }
@@ -140,7 +201,7 @@ const highlightPlugin = ViewPlugin.fromClass(
 
 export default class NnyjSyntaxHighlight extends Plugin {
   onload() {
-    this.registerEditorExtension(highlightPlugin);
+    this.registerEditorExtension([highlightPlugin, tablePlugin]);
     this.registerMarkdownPostProcessor(element => element.querySelectorAll('table').forEach(shadeTable));
     this.app.workspace.onLayoutReady(() => {
       const app = this.app as unknown as { commands: { commands: Record<string, { icon?: string } | undefined> } };
