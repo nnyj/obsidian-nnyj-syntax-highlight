@@ -9,6 +9,7 @@ export default tseslint.config(
     'dist',
     'esbuild.config.mjs',
     'version-bump.mjs',
+    'table_levels_check.mjs',
     'versions.json',
     'main.js',
     'eslint.config.mjs',

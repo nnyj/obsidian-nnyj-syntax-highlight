@@ -1,6 +1,7 @@
 import { Plugin } from 'obsidian';
 import { ViewPlugin, Decoration, EditorView, ViewUpdate, DecorationSet } from '@codemirror/view';
 import { RangeSetBuilder, Text, type Range } from '@codemirror/state';
+import { cellLevels } from './table_levels';
 
 interface Pattern {
   re: () => RegExp;
@@ -95,39 +96,17 @@ function buildDecorations(view: EditorView): DecorationSet {
 }
 
 const LEVEL_CLASSES = [0, 1, 2, 3, 4].map(level => `nnyj-level-${level}`);
-const CIRCLE_LEVELS: Record<string, number> = { '🔴': 0, '🟡': 2, '🟢': 4 };
-// Leading number after an optional `~` or `$`, trailing text like ` ms` or ` (1.2x)` is ignored.
-const RE_NUMBER = /^[~$]*([-+]?\d[\d,]*(?:\.\d+)?)/;
 const RE_ROW = /^\s*\|.*\|\s*$/;
 const RE_SEP = /^\s*\|[\s:|-]+\|\s*$/;
-
-// Circle cells take the circle's level. Numeric cells scale min..max to red..green, `↓` in the header flips it.
-function columnLevels(head: string, cells: string[]): (number | undefined)[] {
-  const values = cells.map(cell => {
-    const match = RE_NUMBER.exec(cell);
-    return match ? parseFloat(match[1]!.replace(/,/g, '')) : undefined;
-  });
-  const numbers = values.filter(value => value !== undefined);
-  const min = Math.min(...numbers);
-  const max = Math.max(...numbers);
-  return cells.map((cell, k) => {
-    const circle = CIRCLE_LEVELS[[...cell][0] ?? ''];
-    const value = values[k];
-    if (circle !== undefined || value === undefined || max === min) return circle;
-    const level = Math.round((value - min) / (max - min) * 4);
-    return head.includes('↓') ? 4 - level : level;
-  });
-}
 
 function shadeTable(table: HTMLTableElement) {
   const [head, ...rows] = Array.from(table.rows);
   if (!head) return;
-  Array.from(head.cells).forEach((headCell, col) => {
-    const cells = rows.map(row => row.cells[col]);
-    const levels = columnLevels(headCell.textContent, cells.map(cell => cell?.textContent.trim() ?? ''));
-    // toggle with force skips unchanged classes, a DOM write would retrigger CodeMirror's observer
-    cells.forEach((cell, k) => LEVEL_CLASSES.forEach((cls, level) => cell?.classList.toggle(cls, levels[k] === level)));
-  });
+  const header = Array.from(head.cells).map(cell => cell.textContent);
+  const { levels } = cellLevels(header, rows.map(row => header.map((_, col) => row.cells[col]?.textContent.trim() ?? '')));
+  // toggle with force skips unchanged classes, a DOM write would retrigger CodeMirror's observer
+  rows.forEach((row, k) => header.forEach((_, col) =>
+    LEVEL_CLASSES.forEach((cls, level) => row.cells[col]?.classList.toggle(cls, levels[k]![col] === level))));
 }
 
 // Cell spans between unescaped pipes.
@@ -155,15 +134,14 @@ function buildTableDecorations(view: EditorView): DecorationSet {
         const line = doc.line(n);
         rows.push({ from: line.from, cells: rowCells(line.text) });
       }
-      rowCells(first.text).forEach((head, col) => {
-        const levels = columnLevels(head.text, rows.map(row => row.cells[col]?.text ?? ''));
-        rows.forEach((row, k) => {
-          const cell = row.cells[col];
-          const level = levels[k];
-          if (cell && level !== undefined)
-            ranges.push(Decoration.mark({ class: LEVEL_CLASSES[level]! }).range(row.from + cell.from, row.from + cell.to));
-        });
-      });
+      const header = rowCells(first.text).map(cell => cell.text);
+      const { levels } = cellLevels(header, rows.map(row => header.map((_, col) => row.cells[col]?.text ?? '')));
+      rows.forEach((row, k) => header.forEach((_, col) => {
+        const cell = row.cells[col];
+        const level = levels[k]![col];
+        if (cell && level !== undefined)
+          ranges.push(Decoration.mark({ class: LEVEL_CLASSES[level]! }).range(row.from + cell.from, row.from + cell.to));
+      }));
     }
     i = Math.max(j, i + 1);
   }
@@ -190,9 +168,9 @@ const highlightPlugin = ViewPlugin.fromClass(
       this.decorations = buildDecorations(view);
     }
     update(update: ViewUpdate) {
-      if (!update.docChanged && !update.viewportChanged) return;
-      this.decorations = buildDecorations(update.view);
-      // Live Preview table widgets render after this update, so shade on the next frame.
+      if (update.docChanged || update.viewportChanged) this.decorations = buildDecorations(update.view);
+      else if (!update.selectionSet) return;
+      // Live Preview table widgets render after this update, also when the cursor leaves a table, so shade on the next frame.
       window.requestAnimationFrame(() => update.view.dom.querySelectorAll('table').forEach(shadeTable));
     }
   },
