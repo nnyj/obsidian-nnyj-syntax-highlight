@@ -47,6 +47,23 @@ function fencedCodeRanges(doc: Text): [number, number][] {
   return ranges;
 }
 
+// Unclosed comment runs to doc end, like CommonMark.
+function htmlCommentRanges(doc: Text, fenced: [number, number][]): [number, number][] {
+  const ranges: [number, number][] = [];
+  const re = /<!--[\s\S]*?(?:-->|$(?![\s\S]))/g;
+  const text = doc.toString();
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const start = m.index;
+    if (fenced.some(([a, b]) => start >= a && start < b)) {
+      re.lastIndex = start + 4;
+      continue;
+    }
+    ranges.push([start, start + m[0].length]);
+  }
+  return ranges;
+}
+
 interface Match {
   from: number;
   to: number;
@@ -56,6 +73,7 @@ interface Match {
 function buildDecorations(view: EditorView): DecorationSet {
   const { doc } = view.state;
   const fenced = fencedCodeRanges(doc);
+  const comments = htmlCommentRanges(doc, fenced);
   const matches: Match[] = [];
 
   for (const { from, to } of view.visibleRanges) {
@@ -75,7 +93,7 @@ function buildDecorations(view: EditorView): DecorationSet {
         while ((m = regex.exec(text)) !== null) {
           const mFrom = m.index;
           const mTo = m.index + m[0].length;
-          if (!overlapsCode(mFrom, mTo, codes))
+          if (!overlapsCode(mFrom, mTo, codes) && !overlapsCode(line.from + mFrom, line.from + mTo, comments))
             matches.push({ from: line.from + mFrom, to: line.from + mTo, cls });
           if (!regex.global) break;
         }
